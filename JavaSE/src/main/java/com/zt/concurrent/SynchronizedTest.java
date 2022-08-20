@@ -1,5 +1,6 @@
 package com.zt.concurrent;
 
+import lombok.extern.slf4j.Slf4j;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -9,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * @author ZT
  */
+@Slf4j
 public class SynchronizedTest {
 
     private static int count = 0;
@@ -34,7 +36,7 @@ public class SynchronizedTest {
         t2.start();
         t1.join();
         t2.join();
-        System.out.println("answer = " + count);// 输出值不确定
+        log.info("answer = " + count);// 输出值不确定
     }
 
 
@@ -61,7 +63,7 @@ public class SynchronizedTest {
         t2.start();
         t1.join();
         t2.join();
-        System.out.println("answer = " + count);// 输出0
+        log.info("answer = " + count);// 输出0
     }
 
 
@@ -89,7 +91,7 @@ public class SynchronizedTest {
         t2.start();
         t1.join();
         t2.join();
-        System.out.println("answer = " + atomicInteger);// 输出0
+        log.info("answer = " + atomicInteger);// 输出0
     }
 
     /**
@@ -139,11 +141,11 @@ public class SynchronizedTest {
             }
         }
 
-        private void method2(List<String> list) {
+        public void method2(List<String> list) {
             list.add("0");
         }
 
-        private void method3(List<String> list) {
+        public void method3(List<String> list) {
             list.remove(0);
         }
     }
@@ -156,6 +158,27 @@ public class SynchronizedTest {
         SharedListSafeThread t1 = new SharedListSafeThread();
         new Thread(() -> t1.method1(100000), "t1").start();
         new Thread(() -> t1.method1(100000), "t2").start();
+    }
+
+    /**
+     * SharedListSafeThread 子类重写 method3 方法
+     */
+    static class SharedListSafeThreadSubClass extends SharedListSafeThread {
+        @Override
+        public void method2(List<String> list) {
+            new Thread(() -> list.add("0")).start();
+        }
+    }
+
+    /**
+     * 出现线程安全问题  局部变量 逃逸到 另一线程
+     */
+    @Test
+    public void opSharedListSafeThreadSubClass() {
+        SharedListSafeThreadSubClass t1 = new SharedListSafeThreadSubClass();
+        for (int i = 0; i < 2; i++) {
+            new Thread(() -> t1.method1(100000), "t" + i).start();
+        }
     }
 
 
