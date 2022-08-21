@@ -10,9 +10,9 @@ import java.util.Vector;
 import java.util.concurrent.locks.LockSupport;
 
 /**
+ * 偏向锁测试
  * @author ZT
  * @version 1.0
- * @description:
  * @date 2022/8/16 19:28
  */
 @Slf4j
@@ -50,6 +50,7 @@ public class BiasedLockTest {
      * 调用hashcode()使得偏向锁撤销，obj mark word 已存放 hashcode，没地方存储threadId
      */
     @Test
+    @SuppressWarnings("all")
     public void biasedLockCancelTest() {
         Object obj = new Object();
         obj.hashCode();
@@ -62,6 +63,7 @@ public class BiasedLockTest {
     /**
      * obj make word 持有当前线程的id 偏向当前线程
      */
+    @SuppressWarnings("all")
     @Test
     public void biasedLockMarkWordTest() {
         Object obj = new Object();
@@ -79,6 +81,7 @@ public class BiasedLockTest {
     /**
      * -XX:BiasedLockingStartupDelay=0 测试偏向锁撤销  重偏向其它线程
      */
+    @SuppressWarnings("all")
     @Test
     public void biasedLockCancelOtherTest() {
         final Object object = new Object();
@@ -127,6 +130,7 @@ public class BiasedLockTest {
      * -XX:BiasedLockingStartupDelay=0   测试批量偏向锁撤销
      * 批量撤销达19次，之后会重新偏向新的线程
      */
+    @SuppressWarnings("all")
     @Test
     public void biasedLockBatchCancel20Test() {
         List<Object> objectList = new Vector<>();
@@ -172,12 +176,13 @@ public class BiasedLockTest {
         ThreadUtil.sleep(10000);
     }
 
-    static Thread t1, t2, t3;
+    private static Thread t1, t2, t3;
 
     /**
      * -XX:BiasedLockingStartupDelay=0
      * 偏向锁批量撤销达39次，jvm就会觉得不应该使用偏向锁，所有对象不再使用偏向锁
      */
+    @SuppressWarnings("all")
     @Test
     public void biasedLockBatchCancel40Test() {
         List<Object> objectList = new Vector<>();
