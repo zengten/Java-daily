@@ -25,8 +25,8 @@
     </properties>
 
     <modules>
-
         <module>JavaSE</module>
+        <module>Redis</module>
     </modules>
 
     <dependencyManagement>
