@@ -60,7 +60,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("账号或密码错误！");
         }
         String token = IdUtil.fastSimpleUUID();
-        redisUtils.set(RedisConstants.LOGIN_USER_KEY + token, user, 300);
+        redisUtils.set(RedisConstants.LOGIN_USER_KEY + token, user, 3600);
         return Result.ok(token);
     }
 
@@ -80,7 +80,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             save(user);
         }
         String token = IdUtil.fastSimpleUUID();
-        redisUtils.set(RedisConstants.LOGIN_USER_KEY + token, user, 300);
+        redisUtils.set(RedisConstants.LOGIN_USER_KEY + token, user, 3600);
         return Result.ok(token);
     }
 
