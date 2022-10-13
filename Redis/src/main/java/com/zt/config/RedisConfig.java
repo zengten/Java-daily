@@ -11,7 +11,11 @@ package com.zt.config;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,9 +36,12 @@ import java.time.Duration;
  * @author Mark sunlightcs@gmail.com
  */
 @Configuration
+@RequiredArgsConstructor
 public class RedisConfig {
-    @Autowired
-    private RedisConnectionFactory factory;
+
+    private final RedisConnectionFactory factory;
+
+    private final RedisProperties redisProperties;
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate() {
@@ -95,9 +102,18 @@ public class RedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jackson2JsonRedisSerializer))
                 .disableCachingNullValues();
 
-        RedisCacheManager cacheManager = RedisCacheManager.builder(factory)
+        return RedisCacheManager.builder(factory)
                 .cacheDefaults(config)
                 .build();
-        return cacheManager;
+    }
+
+
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        config.useSingleServer()
+                .setAddress("redis://" + redisProperties.getHost() + ":6379")
+                .setDatabase(redisProperties.getDatabase());
+        return Redisson.create(config);
     }
 }
