@@ -1,20 +1,33 @@
 package com.zt;
 
-import com.zt.service.IShopService;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.lang.Console;
 import com.zt.service.impl.ShopServiceImpl;
+import com.zt.utils.RedisIdGenerator;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest
 public class SpringTestApplications {
 
+    private static final ExecutorService es = Executors.newFixedThreadPool(500);
+
 
     @Autowired
     private ShopServiceImpl shopService;
+
+
+    @Autowired
+    private RedisIdGenerator redisIdGenerator;
 
 
     @Test
@@ -24,5 +37,31 @@ public class SpringTestApplications {
         }
     }
 
+
+    @Test
+    public void testIdGenerator() {
+        long l = redisIdGenerator.nextId();
+        System.out.println("l = " + l);
+    }
+
+
+    @Test
+    public void testBatchIdGenerator() throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(500);
+        Runnable task = () -> {
+            for (int i = 0; i < 100; i++) {
+                long id = redisIdGenerator.nextId("order:");
+                System.out.println("id = " + id);
+            }
+            latch.countDown();
+        };
+        long begin = DateUtil.current();
+        for (int i = 0; i < 500; i++) {
+            es.submit(task);
+        }
+        latch.await(10, TimeUnit.SECONDS);
+        long end = DateUtil.current();
+        Console.print("time = {}\n",end - begin);
+    }
 
 }
