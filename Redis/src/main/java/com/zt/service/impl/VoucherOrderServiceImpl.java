@@ -11,6 +11,8 @@ import com.zt.service.IVoucherOrderService;
 import com.zt.utils.RedisIdGenerator;
 import com.zt.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 
 /**
@@ -40,9 +43,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private RedissonClient redissonClient;
+
     @Override
+    @SuppressWarnings("all")
     public Result seckill(Long voucherId) {
         SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
+        if(Objects.isNull(seckillVoucher)) {
+            return Result.fail("秒杀不存在！");
+        }
         LocalDateTime now = LocalDateTime.now();
         if(now.isBefore(seckillVoucher.getBeginTime())) {
             return Result.fail("活动未开始！");
@@ -56,6 +66,27 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
 
         Long userId = UserHolder.getUser().getId();
+        // 使用 synchronized 锁
+//        return useSynchronizedLock(userId, voucherId);
+        // 使用 SimpleRedisLock
+//        SimpleRedisLock lock = new SimpleRedisLock(userId.toString(), stringRedisTemplate);
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        boolean isLock = lock.tryLock();
+        if (!isLock) {
+            return Result.fail("系统繁忙，请稍后再试！");
+        }
+        try {
+            IVoucherOrderService proxy  = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 使用 synchronized 锁   仅适用于 单机情况
+     */
+    private Result useSynchronizedLock(Long userId, Long voucherId) {
         // 使用userId 作为锁   字符串必须加 intern() 才是同一对象
         synchronized (userId.toString().intern()) {
             // 必须使用代理对象调用方法才能使用声明式事务
@@ -72,7 +103,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     public Result createVoucherOrder(Long voucherId) {
         // 一人一单
         Long userId = UserHolder.getUser().getId();
-        Long orderId = null;
         int count = count(Wrappers.<VoucherOrder>lambdaQuery()
                 .eq(VoucherOrder::getUserId, userId)
                 .eq(VoucherOrder::getVoucherId, voucherId));
@@ -87,7 +117,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (!update) {
             return Result.fail("系统繁忙，请稍后再试！");
         }
-        orderId = redisIdGenerator.nextId("order:");
+        Long orderId = redisIdGenerator.nextId("order:");
         save(VoucherOrder.builder()
                 .id(orderId)
                 .userId(userId)
