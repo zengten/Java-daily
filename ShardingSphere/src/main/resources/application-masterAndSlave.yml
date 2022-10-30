@@ -1,0 +1,60 @@
+# 读写分离数据源配置
+spring:
+  application:
+    name: sharging-jdbc-demo
+
+  shardingsphere:
+    mode:
+      # 内存模式
+      type: Memory
+    props:
+      # 打印sql
+      sql-show: true
+    # 数据源
+    datasource:
+      names: master,slave1,slave2
+      master:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3306/db_user?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+      slave1:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3307/db_user?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+      slave2:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3308/db_user?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+
+    # 配置读写分离类型，如: Static，Dynamic
+    rules:
+      readwrite-splitting:
+        data-sources:
+          # 取名数据源名称
+          myds:
+            type: Static
+            props:
+              # 写数据源
+              write-data-source-name: master
+              # 读数据源
+              read-data-source-names: slave1,slave2
+            # 负载均衡算法配置，取名
+            load-balancer-name: alg_round
+        load-balancers:
+          alg_round:
+            # 读库算法配置，轮询
+            #type: ROUND_ROBIN
+            # 读库算法配置，随机
+            #type: RANDOM
+            # 读库算法配置，权重
+            type: WEIGHT
+            # 配置权重
+            props:
+              slave1: 1
+              slave2: 2

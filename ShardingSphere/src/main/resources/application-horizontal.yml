@@ -1,0 +1,133 @@
+# 水平分库和水平分表 数据源配置
+spring:
+  application:
+    name: sharging-jdbc-demo
+
+  shardingsphere:
+    mode:
+      # 内存模式
+      type: Memory
+    props:
+      # 打印sql
+      sql-show: true
+    # 数据源 server-user,server-order0,server-order1
+    datasource:
+      names: server-user,server-order0,server-order1
+      server-user:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3301/db_user?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+      server-order0:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3309/db_order?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+      server-order1:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3310/db_order?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+
+    # 配置水平分库 t_user和t_order分别设置数据库，t_order同时设置多个表分片
+    rules:
+      sharding:
+        # 配置广播表，每个库分片均存在
+        broadcast-tables:
+          - t_dict
+        # 配置绑定表，会绑定一组分片表，提升联表查询效率
+        binding-tables:
+          - t_order,t_order_item
+        # 配置分布式id主键
+        key-generators:
+          # 自定义算法名称，填在所需处
+          alg-snowflake:
+            # 雪花算法
+            type: SNOWFLAKE
+            # 不是分表策略不配置
+            # props.xxx:
+        tables:
+          # 逻辑表
+          t_user:
+            # 实际表
+            actual-data-nodes: server-user.t_user
+
+          t_order:
+            # 设置多个数据分片，逗号隔开，多张表分片必须配置分片算法
+            #actual-data-nodes: server-order0.t_order0,server-order0.t_order1,server-order1.t_order0,server-order1.t_order1
+            # 只配置分库策略时，使用的 data-nodes
+            #actual-data-nodes: server-order0.t_order0,server-order1.t_order0
+            # line表达式
+            actual-data-nodes: server-order$->{0..1}.t_order$->{0..1}
+            # 配置t_order表分布式id生成策略
+            key-generate-strategy:
+              # 必须指定列名，不然shardingSphere会报错 Column is required
+              column: id
+              key-generator-name: alg-snowflake
+            # 库分片策略
+            database-strategy:
+              standard:
+                # 分片列
+                sharding-column: user_id
+                # 分片算法名称
+                sharding-algorithm-name: alg_mod
+            # 同个库 多张实际表时，表分片策略
+            table-strategy:
+              standard:
+                # 分片列
+                sharding-column: order_no
+                # 分片算法名称，下面配置
+                sharding-algorithm-name: alg_hash_mod
+          # 逻辑表
+          t_order_item:
+            actual-data-nodes: server-order$->{0..1}.t_order_item$->{0..1}
+            key-generate-strategy:
+              # 必须指定列名，不然shardingSphere会报错 Column is required
+              column: id
+              key-generator-name: alg-snowflake
+            # 库分片策略
+            database-strategy:
+              standard:
+                # 分片列
+                sharding-column: user_id
+                # 分片算法名称
+                sharding-algorithm-name: alg_mod
+            # 同个库 多张实际表时，表分片策略
+            table-strategy:
+              standard:
+                # 分片列
+                sharding-column: order_no
+                # 分片算法名称，下面配置
+                sharding-algorithm-name: alg_hash_mod
+          #广播表 逻辑字典表
+          t_dict:
+            actual-data-nodes: server-order$->{0..1}.t_dict,server-user.t_dict
+
+
+        # 具体分片算法配置
+        sharding-algorithms:
+          # 自定义名称 行表达式类型  取模算法
+          alg_inline_userid:
+            # 分片算法类型，行表达式分片算法
+            type: INLINE
+            props:
+              # 分片算法属性配置，决定存储数据库
+              algorithm-expression: server-order$->{user_id % 2}
+
+          # 自定义名称  取模算法 与上面行表达式结果一样，此取模该列必须数字
+          alg_mod:
+            # 分片算法类型，行表达式分片算法
+            type: MOD
+            props:
+              # 分片算法属性配置，有几个分片，取模几
+              sharding-count: 2
+
+          # 自定义名称  配置字符串hash算法
+          alg_hash_mod:
+            type: HASH_MOD
+            props:
+              sharding-count: 2
+

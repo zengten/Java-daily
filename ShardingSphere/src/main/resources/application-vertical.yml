@@ -1,0 +1,39 @@
+# 垂直分库数据源配置
+spring:
+  application:
+    name: sharging-jdbc-demo
+
+  shardingsphere:
+    mode:
+      # 内存模式
+      type: Memory
+    props:
+      # 打印sql
+      sql-show: true
+    # 数据源 server-user,server-order
+    datasource:
+      names: server-user,server-order
+      server-user:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3301/db_user?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+      server-order:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.jdbc.Driver
+        jdbc-url: jdbc:mysql://192.168.6.129:3302/db_order?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+        username: root
+        password: 123456
+
+    # 配置垂直分库 t_user和t_order分别设置两个数据库，问题：不设置的表呢？
+    rules:
+      sharding:
+        tables:
+          # 逻辑表
+          t_user:
+            # 实际表
+            actual-data-nodes: server-user.t_user
+
+          t_order:
+            actual-data-nodes: server-order.t_order

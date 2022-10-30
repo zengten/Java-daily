@@ -11,7 +11,6 @@ import com.zt.service.IVoucherOrderService;
 import com.zt.utils.RedisIdGenerator;
 import com.zt.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,8 +19,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.time.LocalDateTime;
-import java.util.Objects;
 
 
 /**
@@ -46,6 +43,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private RedissonClient redissonClient;
 
+    @Override
+    @SuppressWarnings("all")
+    public Result seckill(Long voucherId) {
+        return null;
+    }
+
+    /***
+     * 使用锁秒杀，同步创建订单
     @Override
     @SuppressWarnings("all")
     public Result seckill(Long voucherId) {
@@ -82,6 +87,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             lock.unlock();
         }
     }
+    **/
 
     /**
      * 使用 synchronized 锁   仅适用于 单机情况

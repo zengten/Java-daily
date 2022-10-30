@@ -1,0 +1,18 @@
+# shardingSphere-proxy 配置文件
+spring:
+  application:
+    name: sharging-proxy-demo
+  # 配置sharding-sphere-proxy地址
+  datasource:
+    # 主从配置
+    # url: jdbc:mysql://192.168.6.129:3321/readwrite_splitting_db?serverTimezone=GMT%2B8&useSSL=false
+    # 垂直分片和水平分片
+    url: jdbc:mysql://192.168.6.129:3321/sharding_db?serverTimezone=GMT%2B8&useSSL=false
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

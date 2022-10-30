@@ -2,6 +2,8 @@ package com.zt;
 
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.Console;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zt.entity.Shop;
 import com.zt.service.impl.ShopServiceImpl;
 import com.zt.utils.RedisIdGenerator;
 import org.junit.Test;
@@ -42,6 +44,15 @@ public class SpringTestApplications {
     public void testIdGenerator() {
         long l = redisIdGenerator.nextId();
         System.out.println("l = " + l);
+    }
+
+    @Test
+    public void testShop() {
+        Page<Shop> page = new Page<>();
+        page.setCurrent(1);
+        page.setSize(5);
+        Page<Shop> page1 = shopService.page(page);
+        System.out.println("page1 = " + page1);
     }
 
 
