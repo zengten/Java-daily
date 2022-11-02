@@ -1,0 +1,38 @@
+# startup.cmd -m standalone 单节点启动nacos
+spring:
+  application:
+    name: seata-demo1-bank2
+
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+
+    alibaba:
+      seata:
+        tx-service-group: seata-demo1
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/seata_bank2?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+    username: root
+    password: root
+
+logging:
+  level:
+    root: INFO
+    com:
+      zt: DEBUG
+      alibaba: ERROR
+
+
+server:
+  port: 8084
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

@@ -28,6 +28,7 @@
         <module>JavaSE</module>
         <module>Redis</module>
         <module>ShardingSphere</module>
+        <module>DistributeTransaction</module>
     </modules>
 
     <dependencyManagement>
