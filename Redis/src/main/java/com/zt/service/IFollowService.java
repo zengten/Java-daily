@@ -1,16 +1,18 @@
 package com.zt.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.zt.dto.Result;
 import com.zt.entity.Follow;
 
 /**
- * <p>
- *  服务类
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * @author ZT
  */
 public interface IFollowService extends IService<Follow> {
+
+    Result isFollow(Long id);
+
+    Result follow(Long id, Boolean isFollow);
+
+    Result commonFollow(Long id);
 
 }

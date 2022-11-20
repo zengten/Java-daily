@@ -2,10 +2,10 @@ package com.zt.controller;
 
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zt.annotation.NoLogin;
 import com.zt.dto.Result;
 import com.zt.dto.UserDTO;
 import com.zt.entity.Blog;
-import com.zt.entity.User;
 import com.zt.service.IBlogService;
 import com.zt.service.IUserService;
 import com.zt.utils.SystemConstants;
@@ -16,12 +16,7 @@ import javax.annotation.Resource;
 import java.util.List;
 
 /**
- * <p>
- * 前端控制器
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * @author ZT
  */
 @RestController
 @RequestMapping("/blog")
@@ -34,21 +29,36 @@ public class BlogController {
 
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
-        // 获取登录用户
-        UserDTO user = UserHolder.getUser();
-        blog.setUserId(user.getId());
-        // 保存探店博文
-        blogService.save(blog);
-        // 返回id
-        return Result.ok(blog.getId());
+        return blogService.saveBlog(blog);
     }
 
+
+    /**
+     * 获取用户的评论
+     */
+    @GetMapping("/{id}")
+    @NoLogin
+    public Result of(@PathVariable("id") Long id) {
+        return blogService.getBlogById(id);
+    }
+
+    /**
+     * 用户点赞和取消
+     */
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
-        // 修改点赞数量
-        blogService.update()
-                .setSql("liked = liked + 1").eq("id", id).update();
-        return Result.ok();
+        return blogService.likeBlog(id);
+    }
+
+    /**
+     * 点赞排行榜
+     * 使用set数据结构实现点赞，但此时点赞列表是无序的
+     * 需要按点赞时间排序，则使用 zSet 数据结构
+     */
+    @GetMapping("/likes/{id}")
+    @NoLogin
+    public Result likesList(@PathVariable("id") Long id) {
+        return blogService.likesList(id);
     }
 
     @GetMapping("/of/me")
@@ -63,21 +73,38 @@ public class BlogController {
         return Result.ok(records);
     }
 
+    /**
+     * 获取热门点评
+     */
     @GetMapping("/hot")
+    @NoLogin
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
+        return blogService.queryHotBlog(current);
+    }
+
+
+    /**
+     * 查询用户的blog
+     */
+    @GetMapping("/of/user")
+    public Result queryBlogByUserId(
+            @RequestParam(value = "current", defaultValue = "1") Integer current,
+            @RequestParam("id") Long id) {
         // 根据用户查询
         Page<Blog> page = blogService.query()
-                .orderByDesc("liked")
-                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+                .eq("user_id", id).page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
         // 获取当前页数据
         List<Blog> records = page.getRecords();
-        // 查询用户
-        records.forEach(blog ->{
-            Long userId = blog.getUserId();
-            User user = userService.getById(userId);
-            blog.setName(user.getNickName());
-            blog.setIcon(user.getIcon());
-        });
         return Result.ok(records);
+    }
+
+    /**
+     * 获取关注用户的动态
+     *
+     */
+    @GetMapping("/of/follow")
+    public Result getFollowBlog(@RequestParam Long lastId,
+                                @RequestParam(defaultValue = "0") Integer offset) {
+        return blogService.getFollowBlog(lastId, offset);
     }
 }

@@ -1,10 +1,14 @@
 package com.zt.controller;
 
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
+import com.zt.annotation.NoLogin;
 import com.zt.dto.LoginFormDTO;
 import com.zt.dto.Result;
+import com.zt.dto.UserDTO;
+import com.zt.entity.User;
 import com.zt.entity.UserInfo;
 import com.zt.service.IUserInfoService;
 import com.zt.service.IUserService;
@@ -15,12 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 
 /**
- * <p>
- * 前端控制器
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * @author ZT
  */
 @Slf4j
 @RestController
@@ -37,6 +36,7 @@ public class UserController {
      * 发送手机验证码
      */
     @PostMapping("code")
+    @NoLogin
     public Result sendCode(@RequestParam("phone") String phone) {
         if (!Validator.isMobile(phone)) {
             return Result.fail("请输入正确的手机号码！");
@@ -50,6 +50,7 @@ public class UserController {
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
     @PostMapping("/login")
+    @NoLogin
     public Result login(@RequestBody LoginFormDTO loginForm) {
         String phone = loginForm.getPhone();
         if (!Validator.isMobile(phone)) {
@@ -90,4 +91,22 @@ public class UserController {
         // 返回
         return Result.ok(info);
     }
+
+    /**
+     * 根据id查询用户
+     * @param userId
+     * @return
+     */
+    @GetMapping("/{id}")
+    public Result queryUserById(@PathVariable("id") Long userId){
+        // 查询详情
+        User user = userService.getById(userId);
+        if (user == null) {
+            return Result.ok();
+        }
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        // 返回
+        return Result.ok(userDTO);
+    }
+
 }

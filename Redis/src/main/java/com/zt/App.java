@@ -10,10 +10,10 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 @EnableCaching
 @EnableAspectJAutoProxy(exposeProxy = true)//暴露代理对象
 @SpringBootApplication
-public class DianPingApplication {
+public class App {
 
     public static void main(String[] args) {
-        SpringApplication.run(DianPingApplication.class, args);
+        SpringApplication.run(App.class, args);
     }
 
 }

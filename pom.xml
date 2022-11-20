@@ -26,9 +26,10 @@
 
     <modules>
         <module>JavaSE</module>
+        <module>RocketMQ</module>
         <module>Redis</module>
-        <module>ShardingSphere</module>
-        <module>DistributeTransaction</module>
+        <!--<module>ShardingSphere</module>-->
+        <!--<module>DistributeTransaction</module>-->
     </modules>
 
     <dependencyManagement>

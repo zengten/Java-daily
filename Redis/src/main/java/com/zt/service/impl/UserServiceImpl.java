@@ -7,12 +7,10 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zt.dto.LoginFormDTO;
-import com.zt.dto.MsgVo;
 import com.zt.dto.Result;
 import com.zt.entity.User;
 import com.zt.mapper.UserMapper;
 import com.zt.service.IUserService;
-import com.zt.utils.MsgSenderUtil;
 import com.zt.utils.RedisConstants;
 import com.zt.utils.RedisUtils;
 import com.zt.utils.RequestUtil;
@@ -41,12 +39,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public Result sendCode(String phone) {
         String code = RandomUtil.randomNumbers(6);
         redisUtils.set(RedisConstants.LOGIN_CODE_KEY + phone, code, 120);
-        MsgVo msgVo = MsgVo.builder()
-                .phone("18173986727")
-                .msg(String.format("%1$s（请输入验证码,完成验证）,如非本人操作，请忽略短信", code))
-                .type("4072")
-                .build();
-        MsgSenderUtil.sendMessage(msgVo);
         return Result.ok();
     }
 

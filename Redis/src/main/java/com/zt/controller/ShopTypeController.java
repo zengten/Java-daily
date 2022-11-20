@@ -1,6 +1,7 @@
 package com.zt.controller;
 
 
+import com.zt.annotation.NoLogin;
 import com.zt.dto.Result;
 import com.zt.entity.ShopType;
 import com.zt.service.IShopTypeService;
@@ -27,6 +28,7 @@ public class ShopTypeController {
     private IShopTypeService typeService;
 
     @GetMapping("list")
+    @NoLogin
     @Cacheable(cacheNames = "cache:shopType")
     public Result queryTypeList() {
         List<ShopType> typeList = typeService

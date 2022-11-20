@@ -14,9 +14,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new RefreshTokenInterceptor(redisUtils)).addPathPatterns("/**").order(0);
+        registry.addInterceptor(new RefreshTokenInterceptor(redisUtils))
+                .addPathPatterns("/**")
+                .order(0);
         registry.addInterceptor(new LoginInterceptor())
-                .excludePathPatterns("/user/login", "/user/code", "/shop/**")
+                .addPathPatterns("/**")
                 .order(1);
     }
 }
