@@ -12,12 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 
 /**
- * <p>
- * 前端控制器
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * @author ZT
  */
 @RestController
 @RequestMapping("/shop")
@@ -56,8 +51,7 @@ public class ShopController {
      */
     @PostMapping("update")
     public Result updateShop(@RequestBody Shop shop) {
-        // 写入数据库
-
+        // 写入数据库3
         return shopService.updateShopById(shop);
     }
 

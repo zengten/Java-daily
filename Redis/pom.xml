@@ -26,7 +26,17 @@
                     <groupId>io.lettuce</groupId>
                     <artifactId>lettuce-core</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.springframework.data</groupId>
+                    <artifactId>spring-data-redis</artifactId>
+                </exclusion>
             </exclusions>
+        </dependency>
+        <!--2.6.2版本才支持 GeoSearch-->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-redis</artifactId>
+            <version>2.6.2</version>
         </dependency>
         <dependency>
             <groupId>redis.clients</groupId>
