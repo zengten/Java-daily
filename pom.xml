@@ -25,9 +25,10 @@
     </properties>
 
     <modules>
+        <module>common</module>
         <module>JavaSE</module>
-        <module>RocketMQ</module>
         <module>Redis</module>
+        <!--<module>RocketMQ</module>-->
         <!--<module>ShardingSphere</module>-->
         <!--<module>DistributeTransaction</module>-->
     </modules>
