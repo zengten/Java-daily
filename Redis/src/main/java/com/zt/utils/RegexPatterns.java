@@ -1,7 +1,7 @@
 package com.zt.utils;
 
 /**
- * @author 虎哥
+ * @author ZT
  */
 public abstract class RegexPatterns {
     /**

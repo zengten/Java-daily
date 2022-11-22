@@ -40,6 +40,9 @@ public class SpringTestApplications {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 同步店铺数据到redis，并设置逻辑过期时间
+     */
     @Test
     public void syncShopData2Redis() {
         for (int i = 1; i < 14; i++) {

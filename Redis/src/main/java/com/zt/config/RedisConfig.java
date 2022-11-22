@@ -33,7 +33,7 @@ import java.time.Duration;
 /**
  * Redis配置
  *
- * @author Mark sunlightcs@gmail.com
+ * @author ZT
  */
 @Configuration
 @RequiredArgsConstructor

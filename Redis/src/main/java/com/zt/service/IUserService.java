@@ -6,12 +6,7 @@ import com.zt.dto.Result;
 import com.zt.entity.User;
 
 /**
- * <p>
- *  服务类
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * @author ZT
  */
 public interface IUserService extends IService<User> {
 
@@ -23,4 +18,5 @@ public interface IUserService extends IService<User> {
 
     Result logout();
 
+    Result sign();
 }

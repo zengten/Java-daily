@@ -12,7 +12,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author ZT
  * @version 1.0
- * @description:
  * @date 2022/10/15 13:43
  */
 @Slf4j

@@ -5,12 +5,7 @@ import com.zt.dto.Result;
 import com.zt.entity.Voucher;
 
 /**
- * <p>
- *  服务类
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * @author ZT
  */
 public interface IVoucherService extends IService<Voucher> {
 

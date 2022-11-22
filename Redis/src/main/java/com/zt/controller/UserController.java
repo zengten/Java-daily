@@ -109,4 +109,18 @@ public class UserController {
         return Result.ok(userDTO);
     }
 
+
+    /**
+     * 用户签到
+     *    思考签到相关功能:
+     *        1.签到
+     *        2.补签
+     *        3.连续签到天数
+     *        4.签到排名
+     *        5.本月(历史)签到情况
+     */
+    @PostMapping("sign")
+    public Result sign() {
+        return userService.sign();
+    }
 }

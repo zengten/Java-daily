@@ -14,26 +14,27 @@ import com.zt.service.IUserService;
 import com.zt.utils.RedisConstants;
 import com.zt.utils.RedisUtils;
 import com.zt.utils.RequestUtil;
+import com.zt.utils.UserHolder;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 
 /**
- * <p>
- * 服务实现类
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * @author ZT
  */
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
 
-
     @Resource
     private RedisUtils redisUtils;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result sendCode(String phone) {
@@ -83,6 +84,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("未登录！");
         }
         redisUtils.delete(RedisConstants.LOGIN_USER_KEY + key);
+        return Result.ok();
+    }
+
+    @Override
+    public Result sign() {
+        Long userId = UserHolder.getUser().getId();
+        LocalDate today = LocalDate.now();
+        String keyPrefix = today.format(DateTimeFormatter.ofPattern("yyyyMM:"));
+        // 签到key格式  sign:202211:userId  方便按时间统计签到人数
+        String key = RedisConstants.USER_SIGN_KEY + keyPrefix + userId;
+        int dayIndex = today.getDayOfMonth();
+        stringRedisTemplate.opsForValue().setBit(key, dayIndex, true);
+        // TODO 改成lua，并返回当天签到排名
         return Result.ok();
     }
 }
