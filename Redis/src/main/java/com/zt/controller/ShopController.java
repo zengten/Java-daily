@@ -3,6 +3,7 @@ package com.zt.controller;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zt.annotation.NoLogin;
 import com.zt.dto.Result;
 import com.zt.entity.Shop;
 import com.zt.service.IShopService;
@@ -27,6 +28,7 @@ public class ShopController {
      * @return 商铺详情数据
      */
     @GetMapping("/{id}")
+    @NoLogin
     public Result queryShopById(@PathVariable("id") Long id) {
         return shopService.queryShopById(id);
     }
@@ -64,6 +66,7 @@ public class ShopController {
      * @return 商铺列表
      */
     @GetMapping("/of/type")
+    @NoLogin
     public Result queryShopByType(
             @RequestParam("typeId") Integer typeId,
             @RequestParam(value = "current", defaultValue = "1") Integer current,

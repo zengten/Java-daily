@@ -74,6 +74,7 @@ public class UserController {
     }
 
     @GetMapping("/me")
+    @NoLogin
     public Result me() {
         return Result.ok(UserHolder.getUser());
     }
@@ -114,13 +115,33 @@ public class UserController {
      * 用户签到
      *    思考签到相关功能:
      *        1.签到
-     *        2.补签
+     *        2.补签：校验补签卡，补签一天并消耗补签卡
      *        3.连续签到天数
-     *        4.签到排名
+     *        4.签到排名：另外添加一个自增key
      *        5.本月(历史)签到情况
      */
-    @PostMapping("sign")
+    @PostMapping("/sign")
     public Result sign() {
         return userService.sign();
     }
+
+
+    /**
+     * 连续签到天数
+     */
+    @PostMapping("/signDay")
+    public Result signDay() {
+        return userService.signDay();
+    }
+
+
+    /**
+     * 当月历史签到情况
+     */
+    @PostMapping("/signOfMonth")
+    public Result signHistory() {
+        return userService.signOfMonth();
+    }
+
+
 }

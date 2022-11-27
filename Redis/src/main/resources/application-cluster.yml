@@ -1,0 +1,12 @@
+# redis master and slave
+spring:
+  redis:
+    enable: cluster
+    master:
+      host: 192.168.6.241
+      port: 6001
+    slaves:
+      - host: 192.168.6.241
+        port: 6002
+      - host: 192.168.6.241
+        port: 6003

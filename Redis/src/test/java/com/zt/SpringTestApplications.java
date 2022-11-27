@@ -45,7 +45,7 @@ public class SpringTestApplications {
      */
     @Test
     public void syncShopData2Redis() {
-        for (int i = 1; i < 14; i++) {
+        for (int i = 1; i <= 14; i++) {
             shopService.saveData2Redis((long) i, 1800);
         }
     }

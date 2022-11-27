@@ -1,5 +1,7 @@
 package com.zt.service.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
@@ -8,6 +10,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zt.dto.LoginFormDTO;
 import com.zt.dto.Result;
+import com.zt.dto.UserSignDetail;
 import com.zt.entity.User;
 import com.zt.mapper.UserMapper;
 import com.zt.service.IUserService;
@@ -15,12 +18,17 @@ import com.zt.utils.RedisConstants;
 import com.zt.utils.RedisUtils;
 import com.zt.utils.RequestUtil;
 import com.zt.utils.UserHolder;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 
@@ -35,6 +43,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    /**
+     * 签到lua
+     */
+    private static final DefaultRedisScript<Long> SIGN_SCRIPT;
+
+    static {
+        SIGN_SCRIPT = new DefaultRedisScript<>();
+        SIGN_SCRIPT.setLocation(new ClassPathResource("/lua/sign.lua"));
+        SIGN_SCRIPT.setResultType(Long.class);
+    }
 
     @Override
     public Result sendCode(String phone) {
@@ -91,12 +110,99 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public Result sign() {
         Long userId = UserHolder.getUser().getId();
         LocalDate today = LocalDate.now();
-        String keyPrefix = today.format(DateTimeFormatter.ofPattern("yyyyMM:"));
+        String signKeyPrefix = today.format(DateTimeFormatter.ofPattern("yyyyMM:"));
         // 签到key格式  sign:202211:userId  方便按时间统计签到人数
-        String key = RedisConstants.USER_SIGN_KEY + keyPrefix + userId;
+        String signKey = RedisConstants.USER_SIGN_KEY + signKeyPrefix + userId;
         int dayIndex = today.getDayOfMonth();
-        stringRedisTemplate.opsForValue().setBit(key, dayIndex, true);
-        // TODO 改成lua，并返回当天签到排名
-        return Result.ok();
+        // 签到自增key
+        String formatDay = today.format(DateTimeFormatter.ofPattern("yyyy:MM:dd"));
+        String signIncrementKey = RedisConstants.SIGN_INDEX_KEY + formatDay;
+        Long result = stringRedisTemplate.execute(SIGN_SCRIPT,
+                ListUtil.of(signKey, signIncrementKey),
+                // 1号签到在第0个bit位置
+                String.valueOf(dayIndex - 1), String.valueOf(1)
+                );
+        if(result == null) {
+            return Result.fail("系统繁忙！");
+        }
+        if(result <= 0) {
+            return Result.fail("今天已经签到过了！");
+        }
+        return Result.ok(StrUtil.format("签到成功，今天第{}个签到！", result));
     }
+
+    @Override
+    public Result signDay() {
+        List<Long> result = getSignValue();
+        // 最多31天，签到在0-30个bit位置
+        if(CollectionUtil.isEmpty(result)) {
+            // 当月连续签到0天
+            return Result.ok(0);
+        }
+        long signValue = result.get(0);
+        int ans = 0;
+        while((signValue & 1) == 1) {
+            signValue >>>= 1;
+            ans++;
+        }
+        return Result.ok(StrUtil.format("连续签到{}天", ans));
+    }
+
+    /**
+     * 获取实际签到数据
+     */
+    private List<Long> getSignValue() {
+        LocalDate today = LocalDate.now();
+        String keyPrefix = today.format(DateTimeFormatter.ofPattern("yyyyMM:"));
+        String key = RedisConstants.USER_SIGN_KEY + keyPrefix + UserHolder.getUser().getId();
+        int dayIndex = today.getDayOfMonth();
+        // bitField key operate u5 0
+        return stringRedisTemplate.opsForValue().bitField(
+                key,
+                BitFieldSubCommands.create().get(BitFieldSubCommands
+                        // 注意这里不是(dayIndex - 1)，dayIndex表示从0开始多少位
+                        .BitFieldType.unsigned(dayIndex)).valueAt(0)
+        );
+    }
+
+    @Override
+    public Result signOfMonth() {
+        List<Long> signValueList = getSignValue();
+        List<UserSignDetail> signEmptyMsg = buildCurMonthSignEmptyMessage();
+        if(CollectionUtil.isEmpty(signValueList)) {
+            return Result.ok(signEmptyMsg);
+        }
+        // 填充签到数据
+        long signValue = signValueList.get(0);
+        // 当月最多是今天已经签到，不可能明天签到了
+        int start = LocalDate.now().getDayOfMonth();
+        for (int i = start - 1; i >= 0; i--) {
+            if((signValue & 1) == 1) {
+                // 当天有签到
+                signEmptyMsg.get(i).setHasSign(true);
+            }
+            signValue >>>= 1;
+        }
+        return Result.ok(signEmptyMsg);
+    }
+
+    /**
+     * 构建当月签到模板数据
+     */
+    private List<UserSignDetail> buildCurMonthSignEmptyMessage() {
+        LocalDate today = LocalDate.now();
+        int year = today.getYear();
+        int month = today.getMonth().getValue();
+        int firstDay = 1;
+        int lastDay = today.lengthOfMonth();
+        List<UserSignDetail> ans = new ArrayList<>();
+        while (firstDay <= lastDay) {
+            String day = StrUtil.format("{}-{}-{}", year, month, firstDay);
+            UserSignDetail detail = new UserSignDetail(day, false);
+            ans.add(detail);
+            firstDay++;
+        }
+        return ans;
+    }
+
 }

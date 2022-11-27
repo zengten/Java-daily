@@ -12,9 +12,11 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
@@ -37,6 +39,7 @@ import java.time.Duration;
  */
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class RedisConfig {
 
     private final RedisConnectionFactory factory;
@@ -108,12 +111,20 @@ public class RedisConfig {
     }
 
 
+    /**
+     * 单机redis 分布式锁
+     * 集群 TODO
+     */
     @Bean
+    @ConditionalOnProperty(prefix = "spring.redis", name = "enable", havingValue = "single")
     public RedissonClient redissonClient() {
         Config config = new Config();
         config.useSingleServer()
                 .setAddress("redis://" + redisProperties.getHost() + ":6379")
                 .setDatabase(redisProperties.getDatabase());
+        log.info("redisson single mode init success...");
         return Redisson.create(config);
     }
+
+
 }
