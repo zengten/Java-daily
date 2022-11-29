@@ -2,12 +2,14 @@ package com.zt.controller;
 
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.zt.annotation.NoLogin;
 import com.zt.dto.Result;
 import com.zt.dto.UserDTO;
 import com.zt.entity.Blog;
 import com.zt.service.IBlogService;
 import com.zt.service.IUserService;
+import com.zt.utils.CaffeineCacheConstant;
 import com.zt.utils.SystemConstants;
 import com.zt.utils.UserHolder;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,9 @@ public class BlogController {
     private IBlogService blogService;
     @Resource
     private IUserService userService;
+
+    @Resource
+    private Cache<String, Result> cache;
 
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
@@ -75,11 +80,12 @@ public class BlogController {
 
     /**
      * 获取热门点评
+     * 使用caffeine Cache查询，实际使用应在service中
      */
     @GetMapping("/hot")
     @NoLogin
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return blogService.queryHotBlog(current);
+        return cache.get(CaffeineCacheConstant.BLOG_HOT + current, key -> blogService.queryHotBlog(current));
     }
 
 
@@ -100,7 +106,8 @@ public class BlogController {
 
     /**
      * 获取关注用户的动态
-     *
+     * 基于推模式实现 feed流
+     * 注意与拉模式，推拉结合模式的比较
      */
     @GetMapping("/of/follow")
     public Result getFollowBlog(@RequestParam Long lastId,

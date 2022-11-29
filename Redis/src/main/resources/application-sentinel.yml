@@ -1,0 +1,11 @@
+# redis sentinel config
+spring:
+  redis:
+    enable: sentinel
+    sentinel:
+      master: mymaster
+      # 注意这里配置的是sentinel集群地址，不是redis-server
+      nodes:
+        - 192.168.6.241:27001
+        - 192.168.6.241:27001
+        - 192.168.6.241:27001
