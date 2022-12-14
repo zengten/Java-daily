@@ -1,5 +1,8 @@
 package com.zt.service.impl;
 
+import cn.hutool.core.collection.ListUtil;
+import cn.hutool.core.convert.Convert;
+import cn.hutool.core.util.BooleanUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zt.dto.Result;
@@ -8,18 +11,26 @@ import com.zt.entity.VoucherOrder;
 import com.zt.mapper.VoucherOrderMapper;
 import com.zt.service.ISeckillVoucherService;
 import com.zt.service.IVoucherOrderService;
+import com.zt.utils.RedisConstants;
 import com.zt.utils.RedisIdGenerator;
+import com.zt.utils.RedisScriptUtil;
 import com.zt.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.StreamInfo;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.util.Objects;
 
 
 /**
@@ -44,33 +55,88 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired(required = false)
     private RedissonClient redissonClient;
 
-    @Override
-    @SuppressWarnings("all")
-    public Result seckill(Long voucherId) {
-        return null;
+    @Autowired
+    private RedisScriptUtil redisScriptUtil;
+
+//    @PostConstruct
+    private void init() {
+        Thread orderHandler = new Thread(new VoucherOrderHandler());
+        orderHandler.start();
     }
 
-    /***
-     * 使用锁秒杀，同步创建订单
+    class VoucherOrderHandler implements Runnable {
+
+        @Override
+        public void run() {
+            // 初始化 stream
+            initStream();
+            // 订阅 redis stream 消息
+        }
+
+        /**
+         * 可优化为 脚本
+         */
+        private void initStream() {
+            Boolean hasKey = stringRedisTemplate.hasKey(RedisConstants.SECKILL_STREAM_KEY);
+            if(BooleanUtil.isFalse(hasKey)) {
+                // 创建key
+                stringRedisTemplate.opsForStream().createGroup(
+                        RedisConstants.SECKILL_STREAM_KEY,
+                        ReadOffset.latest(),
+                        "g2");
+            }
+            StreamInfo.XInfoGroups groups = stringRedisTemplate.opsForStream().groups(RedisConstants.SECKILL_STREAM_KEY);
+
+        }
+    }
+
     @Override
     @SuppressWarnings("all")
     public Result seckill(Long voucherId) {
+//        return useLockCreateOrder(voucherId);
+        return asyncCreateOrder(voucherId);
+    }
+
+    /**
+     * 异步创建订单
+     */
+    private Result asyncCreateOrder(Long voucherId) {
+        Long userId = UserHolder.getUser().getId();
+        long orderId = redisIdGenerator.nextId(RedisConstants.SECKILL_ID_PREFIX);
+        RedisScript<Long> script = redisScriptUtil.getRedisScript(RedisScriptUtil.ScriptEnum.SECKILL);
+        Long res = stringRedisTemplate.execute(
+                script,
+                ListUtil.empty(),
+                String.valueOf(orderId), voucherId.toString(), userId.toString()
+        );
+        // 默认显示库存不足
+        int resIntValue = Convert.toInt(res, 1);
+        if(resIntValue != 0) {
+            return Result.fail(resIntValue == 1 ? "手慢了，已经抢购一空啦！" : "已经下单过了，不能重复下单！");
+        }
+        return Result.ok(orderId);
+    }
+
+    /**
+     * 使用锁秒杀，同步创建订单
+     * synchronized,simpleRedisLock,redissonLock
+     */
+    private Result useLockCreateOrder(Long voucherId) {
         SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
-        if(Objects.isNull(seckillVoucher)) {
+        if (Objects.isNull(seckillVoucher)) {
             return Result.fail("秒杀不存在！");
         }
         LocalDateTime now = LocalDateTime.now();
-        if(now.isBefore(seckillVoucher.getBeginTime())) {
+        if (now.isBefore(seckillVoucher.getBeginTime())) {
             return Result.fail("活动未开始！");
         }
-        if(now.isAfter(seckillVoucher.getEndTime())) {
+        if (now.isAfter(seckillVoucher.getEndTime())) {
             return Result.fail("活动已经结束！");
         }
         Integer stock = seckillVoucher.getStock();
-        if(stock < 1) {
+        if (stock < 1) {
             return Result.fail("库存不足！");
         }
-
         Long userId = UserHolder.getUser().getId();
         // 使用 synchronized 锁
 //        return useSynchronizedLock(userId, voucherId);
@@ -82,13 +148,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("系统繁忙，请稍后再试！");
         }
         try {
-            IVoucherOrderService proxy  = (IVoucherOrderService) AopContext.currentProxy();
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
         } finally {
             lock.unlock();
         }
     }
-    **/
 
     /**
      * 使用 synchronized 锁   仅适用于 单机情况
@@ -97,7 +162,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 使用userId 作为锁   字符串必须加 intern() 才是同一对象
         synchronized (userId.toString().intern()) {
             // 必须使用代理对象调用方法才能使用声明式事务
-            IVoucherOrderService proxy  = (IVoucherOrderService) AopContext.currentProxy();
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
         }
     }
@@ -113,7 +178,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         int count = count(Wrappers.<VoucherOrder>lambdaQuery()
                 .eq(VoucherOrder::getUserId, userId)
                 .eq(VoucherOrder::getVoucherId, voucherId));
-        if(count > 0) {
+        if (count > 0) {
             return Result.fail("用户已经下过单！");
         }
         // 乐观锁实现方式一  数据库行锁1
@@ -139,10 +204,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      */
     private boolean updateStockDecrement(Long voucherId) {
         return seckillVoucherService.lambdaUpdate()
-                    .setSql("stock = stock - 1")
-                    .eq(SeckillVoucher::getVoucherId, voucherId)
-                    .gt(SeckillVoucher::getStock, 0)
-                    .update();
+                .setSql("stock = stock - 1")
+                .eq(SeckillVoucher::getVoucherId, voucherId)
+                .gt(SeckillVoucher::getStock, 0)
+                .update();
     }
 
     /**
@@ -150,9 +215,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      */
     private boolean updateStockByStockVersion(Long voucherId, Integer stock) {
         return seckillVoucherService.update(Wrappers.<SeckillVoucher>lambdaUpdate()
-                    .set(SeckillVoucher::getStock, stock - 1)
-                    .eq(SeckillVoucher::getVoucherId, voucherId)
-                    .eq(SeckillVoucher::getStock, stock)
-                );
+                .set(SeckillVoucher::getStock, stock - 1)
+                .eq(SeckillVoucher::getVoucherId, voucherId)
+                .eq(SeckillVoucher::getStock, stock)
+        );
     }
 }

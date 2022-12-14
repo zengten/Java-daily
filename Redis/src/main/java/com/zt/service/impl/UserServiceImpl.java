@@ -14,17 +14,13 @@ import com.zt.dto.UserSignDetail;
 import com.zt.entity.User;
 import com.zt.mapper.UserMapper;
 import com.zt.service.IUserService;
-import com.zt.utils.RedisConstants;
-import com.zt.utils.RedisUtils;
-import com.zt.utils.RequestUtil;
-import com.zt.utils.UserHolder;
-import org.springframework.core.io.ClassPathResource;
+import com.zt.utils.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -36,24 +32,14 @@ import java.util.Objects;
  * @author ZT
  */
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
 
-    @Resource
-    private RedisUtils redisUtils;
+    private final RedisUtils redisUtils;
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    /**
-     * 签到lua
-     */
-    private static final DefaultRedisScript<Long> SIGN_SCRIPT;
-
-    static {
-        SIGN_SCRIPT = new DefaultRedisScript<>();
-        SIGN_SCRIPT.setLocation(new ClassPathResource("/lua/sign.lua"));
-        SIGN_SCRIPT.setResultType(Long.class);
-    }
+    private final RedisScriptUtil redisScriptUtil;
 
     @Override
     public Result sendCode(String phone) {
@@ -117,7 +103,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 签到自增key
         String formatDay = today.format(DateTimeFormatter.ofPattern("yyyy:MM:dd"));
         String signIncrementKey = RedisConstants.SIGN_INDEX_KEY + formatDay;
-        Long result = stringRedisTemplate.execute(SIGN_SCRIPT,
+        RedisScript<Long> script = redisScriptUtil.getRedisScript(RedisScriptUtil.ScriptEnum.SIGN);
+        Long result = stringRedisTemplate.execute(script,
                 ListUtil.of(signKey, signIncrementKey),
                 // 1号签到在第0个bit位置
                 String.valueOf(dayIndex - 1), String.valueOf(1)
