@@ -8,9 +8,9 @@ local voucherId = ARGV[2]
 
 local userId = ARGV[3]
 
--- 拼接业务前缀
+-- 拼接业务前缀,注意这里都是优惠券id
 
-local orderKey = 'seckill:order:' .. orderId
+local orderKey = 'seckill:order:' .. voucherId
 
 local stockKey = 'seckill:stock:' .. voucherId
 

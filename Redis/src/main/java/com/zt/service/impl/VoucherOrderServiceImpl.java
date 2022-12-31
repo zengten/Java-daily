@@ -1,7 +1,10 @@
 package com.zt.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.convert.Convert;
+import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.BooleanUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -20,17 +23,21 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.connection.stream.ReadOffset;
-import org.springframework.data.redis.connection.stream.StreamInfo;
+import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.locks.LockSupport;
 
 
 /**
@@ -41,6 +48,7 @@ import java.util.Objects;
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
 
     @Resource
+    @SuppressWarnings("SpellCheckingInspection")
     private ISeckillVoucherService seckillVoucherService;
 
     @Resource
@@ -52,53 +60,142 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    @Autowired(required = false)
+    @Resource
     private RedissonClient redissonClient;
 
     @Autowired
     private RedisScriptUtil redisScriptUtil;
 
-//    @PostConstruct
-    private void init() {
-        Thread orderHandler = new Thread(new VoucherOrderHandler());
-        orderHandler.start();
-    }
+    private final Thread handlePendingListThread;
 
-    class VoucherOrderHandler implements Runnable {
+    private final Thread handleCreateOrderThread;
 
-        @Override
-        public void run() {
-            // 初始化 stream
-            initStream();
-            // 订阅 redis stream 消息
-        }
-
-        /**
-         * 可优化为 脚本
-         */
-        private void initStream() {
-            Boolean hasKey = stringRedisTemplate.hasKey(RedisConstants.SECKILL_STREAM_KEY);
-            if(BooleanUtil.isFalse(hasKey)) {
-                // 创建key
-                stringRedisTemplate.opsForStream().createGroup(
-                        RedisConstants.SECKILL_STREAM_KEY,
-                        ReadOffset.latest(),
-                        "g2");
-            }
-            StreamInfo.XInfoGroups groups = stringRedisTemplate.opsForStream().groups(RedisConstants.SECKILL_STREAM_KEY);
-
-        }
+    /**
+     * 异步创建订单消费线程 和 出现异常情况pendingList线程
+     */
+    public VoucherOrderServiceImpl() {
+        this.handlePendingListThread = new Thread(new SeckillPendListHandler(), "handlePendingList");
+        this.handleCreateOrderThread = new Thread(new CreateOrderHandler(), "handleCreateOrder");
     }
 
     @Override
-    @SuppressWarnings("all")
+    @SuppressWarnings("SpellCheckingInspection")
     public Result seckill(Long voucherId) {
 //        return useLockCreateOrder(voucherId);
         return asyncCreateOrder(voucherId);
     }
 
+
+    @PostConstruct
+    private void threadInit() {
+        // 初始化stream
+        initOrderStream();
+        // 休眠1s防止stream没有初始化完成
+        ThreadUtil.sleep(1000);
+        // 启动消息监听
+        handlePendingListThread.start();
+        handleCreateOrderThread.start();
+    }
+
+    /**
+     * 初始化创建订单的数据key和消费分组
+     */
+    private void initOrderStream() {
+        Boolean hasKey = stringRedisTemplate.hasKey(RedisConstants.SECKILL_STREAM);
+        if(BooleanUtil.isFalse(hasKey)) {
+            log.info(">>>stream key不存在，开始创建");
+            stringRedisTemplate.opsForStream().createGroup(RedisConstants.SECKILL_STREAM, "g1");
+        }
+        StreamInfo.XInfoGroups groups = stringRedisTemplate.opsForStream().groups(RedisConstants.SECKILL_STREAM);
+        if(groups.isEmpty()) {
+            log.info(">>>消费组不存在，开始创建");
+            stringRedisTemplate.opsForStream().createGroup(RedisConstants.SECKILL_STREAM, "g1");
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "InfiniteLoopStatement"})
+    class CreateOrderHandler implements Runnable {
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    // 读取创建订单消息
+                    List<MapRecord<String, Object, Object>> recordList = stringRedisTemplate.opsForStream().read(
+                            Consumer.from("g1", "c1"),
+                            StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2L)),
+                            StreamOffset.create(RedisConstants.SECKILL_STREAM, ReadOffset.lastConsumed())
+                    );
+                    // 无消息，继续下次循环，然后阻塞
+                    if (CollectionUtil.isEmpty(recordList)) {
+                        continue;
+                    }
+                    // 创建订单
+                    useConsumerCreateOrder(recordList.get(0));
+                } catch (Exception e) {
+                    log.error(">>>创建订单异常，唤醒pendList线程处理", e);
+                    // 进入pendingList处理
+                    LockSupport.unpark(handlePendingListThread);
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings({"InfiniteLoopStatement", "unchecked", "SpellCheckingInspection"})
+    class SeckillPendListHandler implements Runnable {
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    List<MapRecord<String, Object, Object>> recordList = stringRedisTemplate.opsForStream().read(
+                            Consumer.from("g1", "c1"),
+                            StreamReadOptions.empty().count(1L).block(Duration.ofSeconds(2L)),
+                            StreamOffset.create(RedisConstants.SECKILL_STREAM, ReadOffset.from("0"))
+                    );
+                    if (CollectionUtil.isEmpty(recordList)) {
+                        log.info(">>>>>pendingList无数据, 线程休眠待唤醒");
+                        LockSupport.park();
+                        continue;
+                    }
+                    // 创建订单
+                    useConsumerCreateOrder(recordList.get(0));
+                } catch (Exception e) {
+                    log.error(">>>处理pendingList异常， ", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * 使用stream创建订单
+     * @param data 订单数据
+     */
+    private void useConsumerCreateOrder(MapRecord<String, Object, Object> data) {
+        RecordId recordId = data.getId();
+        Map<Object, Object> createOrderData = data.getValue();
+        VoucherOrder voucherOrder = BeanUtil.toBean(createOrderData, VoucherOrder.class);
+        boolean stockDecrement = updateStockDecrement(voucherOrder.getVoucherId());
+        if(!stockDecrement) {
+            log.error(">>>库存扣减失败！");
+            return;
+        }
+        if (save(voucherOrder)) {
+            log.info(">>>创建订单成功，id = {}", voucherOrder.getId());
+            Long acknowledge = stringRedisTemplate.opsForStream().acknowledge(
+                    RedisConstants.SECKILL_STREAM,
+                    "g1",
+                    recordId
+            );
+            log.info(">>>订单成功确认{}条", acknowledge);
+        }
+    }
+
     /**
      * 异步创建订单
+     * 问题1：消息的实时性，后面付款问题需要
+     * 问题2：扣减库存的查询实时性，前端展示(可以延迟)
+     * 问题3：延迟取消订单实现
      */
     private Result asyncCreateOrder(Long voucherId) {
         Long userId = UserHolder.getUser().getId();
@@ -111,8 +208,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         );
         // 默认显示库存不足
         int resIntValue = Convert.toInt(res, 1);
-        if(resIntValue != 0) {
-            return Result.fail(resIntValue == 1 ? "手慢了，已经抢购一空啦！" : "已经下单过了，不能重复下单！");
+        if (resIntValue != 0) {
+            return Result.fail(resIntValue == 1 ? "已经抢购一空啦！" : "已经下单过了，不能重复下单！");
         }
         return Result.ok(orderId);
     }

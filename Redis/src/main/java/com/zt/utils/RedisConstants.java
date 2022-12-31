@@ -25,5 +25,5 @@ public class RedisConstants {
 
     public static final String SECKILL_ID_PREFIX = "seckill:";
 
-    public static final String SECKILL_STREAM_KEY = "stream.seckill";
+    public static final String SECKILL_STREAM = "order.streams";
 }

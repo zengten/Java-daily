@@ -1,6 +1,7 @@
 package com.zt.controller;
 
 
+import com.zt.annotation.NoLogin;
 import com.zt.dto.Result;
 import com.zt.entity.Voucher;
 import com.zt.service.IVoucherService;
@@ -35,6 +36,7 @@ public class VoucherController {
      * @return 优惠券id
      */
     @PostMapping("seckill")
+    @NoLogin
     public Result addSeckillVoucher(@RequestBody Voucher voucher) {
         voucherService.addSeckillVoucher(voucher);
         return Result.ok(voucher.getId());
