@@ -28,7 +28,8 @@
         <module>common</module>
         <module>JavaSE</module>
         <!--<module>Redis</module>-->
-        <module>RocketMQ</module>
+        <!--<module>RocketMQ</module>-->
+        <module>FreeMarker</module>
         <!--<module>ShardingSphere</module>-->
         <!--<module>DistributeTransaction</module>-->
     </modules>
