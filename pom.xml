@@ -29,10 +29,11 @@
         <module>JavaSE</module>
         <!--<module>Redis</module>-->
         <!--<module>RocketMQ</module>-->
-        <module>FreeMarker</module>
+        <!--<module>FreeMarker</module>-->
         <!--<module>ShardingSphere</module>-->
         <!--<module>DistributeTransaction</module>-->
-        <module>design-pattern</module>
+        <!--<module>design-pattern</module>-->
+        <module>EasyExcel</module>
     </modules>
 
     <dependencyManagement>
